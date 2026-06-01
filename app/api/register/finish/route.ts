@@ -1,95 +1,51 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyRegistrationResponse } from '@simplewebauthn/server';
-import { randomUUID } from 'crypto';
-import { User, Passkey } from '@/lib/db';
+import { findUserByUsername, consumeChallenge, savePasskey } from '@/lib/auth';
 
-const challenges = new Map<string, string>();
+const RP_ID     = process.env.RP_ID     ?? 'localhost';
+const ORIGIN    = process.env.ORIGIN    ?? 'http://localhost:3000';
 
 export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json();
-    console.log('📥 Received body:', { 
-      hasUsername: !!body.username, 
-      hasAttestation: !!body.attestationResponse,
-      hasUserId: !!body.userId 
-    });
-    
-    const { username, attestationResponse, userId } = body;
-    
-    if (!username || !attestationResponse || !userId) {
-      console.log('❌ Missing data:', { username, userId, hasAttestation: !!attestationResponse });
-      return NextResponse.json({ error: 'Missing data' }, { status: 400 });
-    }
-
-    const expectedChallenge = challenges.get(userId);
-    console.log('🔐 Expected challenge exists:', !!expectedChallenge);
-    
-    if (!expectedChallenge) {
-      return NextResponse.json({ error: 'Challenge expired or not found' }, { status: 400 });
-    }
-
-    const rpID = req.headers.get('host')?.split(':')[0] || 'localhost';
-    const protocol = req.headers.get('x-forwarded-proto') || 'https';
-    const origin = `${protocol}://${rpID}${process.env.NODE_ENV === 'development' ? ':3000' : ''}`;
-    
-    console.log('🌐 Environment:', { rpID, origin, protocol });
-
-    let verification;
-    try {
-      console.log('🔍 Attempting verification...');
-      verification = await verifyRegistrationResponse({
-        response: attestationResponse,
-        expectedChallenge,
-        expectedRPID: rpID,
-        expectedOrigin: origin,
-      });
-      console.log('✅ Verification result:', { 
-        verified: verification.verified, 
-        hasInfo: !!verification.registrationInfo 
-      });
-    } catch (err) {
-      console.error('❌ Verification error:', err);
-      return NextResponse.json({ error: 'Verification failed: ' + String(err) }, { status: 400 });
-    }
-
-    if (!verification.verified || !verification.registrationInfo) {
-      console.log('❌ Invalid registration response');
-      return NextResponse.json({ error: 'Invalid registration response' }, { status: 400 });
-    }
-
-    // ✅ FIXED: In v13, credential info is nested differently
-    const { credential } = verification.registrationInfo;
-    const credentialID = credential.id;
-    const credentialPublicKey = credential.publicKey;  // ✅ This is Uint8Array
-    const counter = credential.counter;
-    
-    console.log('🔑 Credential info:', { credentialID, counter, hasPublicKey: !!credentialPublicKey });
-
-    // Convert public key from Uint8Array to base64url for storage
-    const publicKeyBase64 = Buffer.from(credentialPublicKey).toString('base64url');
-
-    // Save user to database
-    const now = Date.now();
-    console.log('💾 Saving user:', { userId, username });
-    User.create.run(userId, username, now);
-
-    // Save passkey to database
-    console.log('💾 Saving passkey for user:', userId);
-    Passkey.create.run(
-      randomUUID(),
-      userId,
-      credentialID,
-      publicKeyBase64,
-      counter,
-      now
-    );
-
-    challenges.delete(userId);
-    console.log('✅ Registration successful!');
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('🔥 Unexpected error:', error);
-    return NextResponse.json({ error: 'Internal server error: ' + String(error) }, { status: 500 });
+  const { username, credential } = await req.json();
+  if (!username || !credential) {
+    return NextResponse.json({ error: 'missing fields' }, { status: 400 });
   }
+
+  const user = findUserByUsername(username);
+  if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+
+  // Consume challenge from DB (one-time use)
+  const expectedChallenge = consumeChallenge(username, 'registration');
+  if (!expectedChallenge) {
+    return NextResponse.json({ error: 'Challenge expired or not found' }, { status: 400 });
+  }
+
+  let verification;
+  try {
+    verification = await verifyRegistrationResponse({
+      response: credential,
+      expectedChallenge,
+      expectedOrigin: ORIGIN,
+      expectedRPID: RP_ID,
+      requireUserVerification: true,
+    });
+  } catch (err) {
+    console.error('verifyRegistrationResponse error:', err);
+    return NextResponse.json({ error: (err as Error).message }, { status: 400 });
+  }
+
+  if (!verification.verified || !verification.registrationInfo) {
+    return NextResponse.json({ error: 'Verification failed' }, { status: 400 });
+  }
+
+  const { credential: cred } = verification.registrationInfo;
+
+  savePasskey({
+    userId: user.id,
+    credentialId: Buffer.from(cred.id).toString('base64url'),
+    publicKey: Buffer.from(cred.publicKey).toString('base64url'),
+    counter: cred.counter,
+  });
+
+  return NextResponse.json({ verified: true });
 }

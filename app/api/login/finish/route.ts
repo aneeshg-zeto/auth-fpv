@@ -1,74 +1,72 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuthenticationResponse } from '@simplewebauthn/server';
-import { challenges, users, credentials } from '@/lib/store';
+import {
+  findUserByUsername,
+  consumeChallenge,
+  findPasskeyByCredentialId,
+  updatePasskeyCounter,
+  createSession,
+} from '@/lib/auth';
+
+const RP_ID  = process.env.RP_ID  ?? 'localhost';
+const ORIGIN = process.env.ORIGIN ?? 'http://localhost:3000';
 
 export async function POST(req: NextRequest) {
-  const { username, assertionResponse, sessionId } = await req.json();
-  if (!username || !assertionResponse || !sessionId) {
-    return NextResponse.json({ error: 'Missing data' }, { status: 400 });
+  const { username, credential } = await req.json();
+  if (!username || !credential) {
+    return NextResponse.json({ error: 'missing fields' }, { status: 400 });
   }
 
-  const expectedChallenge = challenges.get(sessionId);
+  const user = findUserByUsername(username);
+  if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+
+  const expectedChallenge = consumeChallenge(username, 'authentication');
   if (!expectedChallenge) {
-    return NextResponse.json({ error: 'Challenge expired' }, { status: 400 });
+    return NextResponse.json({ error: 'Challenge expired or not found' }, { status: 400 });
   }
 
-  // Find user
-  const user = Array.from(users.values()).find(u => u.username === username);
-  if (!user) {
-    return NextResponse.json({ error: 'User not found' }, { status: 400 });
-  }
-
-  // Find the credential that was used
-  const credentialId = assertionResponse.id;
-  const storedCred = credentials.get(credentialId);
-  if (!storedCred || storedCred.userId !== user.userId) {
-    return NextResponse.json({ error: 'Credential not found for this user' }, { status: 400 });
-  }
-
-  const rpID = req.headers.get('host')?.split(':')[0] || 'localhost';
-  const origin = `${req.headers.get('x-forwarded-proto') || 'http'}://${rpID}${process.env.NODE_ENV === 'development' ? ':3000' : ''}`;
-
-  // ✅ Convert stored publicKey from base64url string back to Uint8Array
-  const publicKeyUint8 = Buffer.from(storedCred.publicKey, 'base64url');
+  // Look up the specific passkey being used (from DB, never from memory)
+  const rawId: string = credential.rawId ?? credential.id;
+  const passkey = findPasskeyByCredentialId(rawId);
+  if (!passkey) return NextResponse.json({ error: 'Credential not found' }, { status: 404 });
 
   let verification;
   try {
     verification = await verifyAuthenticationResponse({
-      response: assertionResponse,
+      response: credential,
       expectedChallenge,
-      expectedRPID: rpID,
-      expectedOrigin: origin,
+      expectedOrigin: ORIGIN,
+      expectedRPID: RP_ID,
+      requireUserVerification: true,
       credential: {
-        id: credentialId,
-        publicKey: publicKeyUint8,  // ✅ Now this is Uint8Array
-        counter: storedCred.counter,
+        id: passkey.credential_id,
+        publicKey: new Uint8Array(Buffer.from(passkey.public_key, 'base64url')),
+        counter: passkey.counter,
         transports: [],
       },
     });
   } catch (err) {
-    console.error(err);
-    return NextResponse.json({ error: 'Verification failed: ' + String(err) }, { status: 400 });
+    console.error('verifyAuthenticationResponse error:', err);
+    return NextResponse.json({ error: (err as Error).message }, { status: 400 });
   }
 
   if (!verification.verified) {
-    return NextResponse.json({ error: 'Invalid assertion' }, { status: 400 });
+    return NextResponse.json({ error: 'Verification failed' }, { status: 400 });
   }
 
-  // Update counter
-  if (verification.authenticationInfo) {
-    storedCred.counter = verification.authenticationInfo.newCounter;
-  }
+  // Update replay-attack counter in DB
+  updatePasskeyCounter(passkey.credential_id, verification.authenticationInfo.newCounter);
 
-  // Remove challenge
-  challenges.delete(sessionId);
+  // Create session in DB; send only the opaque ID as HttpOnly cookie
+  const sessionId = createSession(user.id, user.username);
 
-  // Set a session cookie
-  const response = NextResponse.json({ success: true });
-  response.cookies.set('demo_user', username, {
-    httpOnly: false,
+  const response = NextResponse.json({ verified: true });
+  response.cookies.set('session_id', sessionId, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
     path: '/',
-    maxAge: 60 * 60 * 24
+    maxAge: 60 * 60 * 8, // 8 hours
   });
   return response;
 }

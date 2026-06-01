@@ -1,44 +1,46 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateRegistrationOptions } from '@simplewebauthn/server';
-import { randomUUID } from 'crypto';
-import { User } from '@/lib/db';
+import { findUserByUsername, findPasskeysByUserId, createUser, saveChallenge } from '@/lib/auth';
 
-const challenges = new Map<string, string>();
+const RP_NAME = 'My WebAuthn App';
+const RP_ID   = process.env.RP_ID ?? 'localhost';
 
 export async function POST(req: NextRequest) {
   const { username } = await req.json();
-  if (!username) {
-    return NextResponse.json({ error: 'Username required' }, { status: 400 });
+  if (!username?.trim()) {
+    return NextResponse.json({ error: 'username required' }, { status: 400 });
   }
 
-  const existingUser = User.findByUsername.get(username);
-  if (existingUser) {
-    return NextResponse.json({ error: 'Username already registered' }, { status: 400 });
-  }
+  // Resolve or pre-create user so we can pass existing credential IDs
+  let user = findUserByUsername(username);
+  let userId: string;
+  let existingCredentialIds: string[] = [];
 
-  const userId = randomUUID();
-  const rpID = req.headers.get('host')?.split(':')[0] || 'localhost';
-  const userIdBuffer = new TextEncoder().encode(userId);
+  if (user) {
+    userId = user.id;
+    existingCredentialIds = findPasskeysByUserId(userId).map(
+      (p) => p.credential_id
+    );
+  } else {
+    userId = createUser(username);
+  }
 
   const options = await generateRegistrationOptions({
-    rpName: 'Biometric Demo',
-    rpID,
-    userID: userIdBuffer,
+    rpName: RP_NAME,
+    rpID: RP_ID,
+    userID: new TextEncoder().encode(userId),
     userName: username,
-    userDisplayName: username,
     attestationType: 'none',
+    excludeCredentials: existingCredentialIds.map((id) => ({ id, transports: [] })),
     authenticatorSelection: {
-      // ✅ FORCE platform authenticator (built-in Touch ID/Windows Hello)
-      authenticatorAttachment: 'platform',  // 'platform' = built-in, 'cross-platform' = USB keys
-      residentKey: 'required',              // Store credential on device
-      userVerification: 'required',         // Always require fingerprint
+      authenticatorAttachment: 'platform',   // only biometric / platform authenticators
+      residentKey: 'required',
+      userVerification: 'required',
     },
-    // ✅ Exclude existing credentials (prevents re-registering same device)
-    excludeCredentials: [],
   });
 
-  challenges.set(userId, options.challenge);
-  setTimeout(() => challenges.delete(userId), 60000);
+  // Persist challenge to DB — NOT to any in-memory Map
+  saveChallenge(username, options.challenge, 'registration');
 
-  return NextResponse.json({ options, userId });
+  return NextResponse.json(options);
 }
