@@ -12,7 +12,6 @@ export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    // 1. Check if user is already authenticated
     fetch('/api/me')
       .then((r) => {
         if (r.ok) {
@@ -21,10 +20,12 @@ export default function RegisterPage() {
       })
       .catch(() => {});
 
-    // 2. Check if biometric credentials are supported
     if (typeof window !== 'undefined') {
       const hasCreds = !!window.PublicKeyCredential;
       setIsSupported(hasCreds);
+      const params = new URLSearchParams(window.location.search);
+      const u = params.get('username');
+      if (u) setUsername(u);
     }
   }, [router]);
 
@@ -69,7 +70,7 @@ export default function RegisterPage() {
       if (result.verified) {
         setStatusType('success');
         setStatus('Registration successful! Redirecting to sign in...');
-        setTimeout(() => router.push('/login'), 1500);
+        setTimeout(() => router.push('/login?registered=true'), 1500);
       } else {
         setStatusType('error');
         setStatus(`Failed: ${result.error}`);

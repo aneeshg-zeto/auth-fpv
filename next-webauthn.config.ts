@@ -1,4 +1,4 @@
-import type { WebAuthnConfig } from "./packages/next-webauthn/src/server/config";
+import type { WebAuthnConfig } from "next-webauthn/server";
 
 const config: WebAuthnConfig = {
   rpName: "My WebAuthn App",

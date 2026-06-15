@@ -1,7 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { startAuthentication } from '@simplewebauthn/browser';
 
 interface UserSession {
   username: string;
@@ -14,9 +13,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const [user, setUser] = useState<UserSession | null>(null);
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
-  const [renewing, setRenewing] = useState(false);
   const [status, setStatus] = useState('');
-  const [statusType, setStatusType] = useState<'success' | 'error' | ''>('');
 
   const fetchSession = () => {
     fetch('/api/me')
@@ -24,7 +21,6 @@ export default function DashboardPage() {
       .then((data) => {
         setUser(data);
         setStatus('');
-        setStatusType('');
       })
       .catch(() => router.push('/login'));
   };
@@ -33,73 +29,22 @@ export default function DashboardPage() {
     fetchSession();
   }, [router]);
 
-  // Session countdown timer
   useEffect(() => {
     if (!user?.expiresAt) return;
-
     const interval = setInterval(() => {
       const remaining = Math.max(0, user.expiresAt - Math.floor(Date.now() / 1000));
       setTimeLeft(remaining);
-
       if (remaining === 0) {
         clearInterval(interval);
         router.push('/login');
       }
     }, 1000);
-
     return () => clearInterval(interval);
   }, [user, router]);
 
   async function handleLogout() {
     await fetch('/api/logout', { method: 'POST' });
     router.push('/login');
-  }
-
-  // Extend current session silently using the registered biometric credential
-  async function handleRenewSession() {
-    if (!user) return;
-    setRenewing(true);
-    setStatus('Initializing session renewal...');
-    setStatusType('');
-
-    try {
-      const opts = await fetch('/api/login/begin', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: user.username }),
-      }).then((r) => r.json());
-
-      if (opts.error) {
-        setRenewing(false);
-        setStatusType('error');
-        return setStatus(`Error: ${opts.error}`);
-      }
-
-      setStatus('Please authorize biometric prompt to extend session...');
-      const credential = await startAuthentication({ optionsJSON: opts });
-
-      setStatus('Renewing session on server...');
-      const result = await fetch('/api/login/finish', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: user.username, credential }),
-      }).then((r) => r.json());
-
-      setRenewing(false);
-
-      if (result.verified) {
-        setStatusType('success');
-        setStatus('Session renewed successfully!');
-        fetchSession(); // refresh data
-      } else {
-        setStatusType('error');
-        setStatus(`Renewal failed: ${result.error}`);
-      }
-    } catch (err) {
-      setRenewing(false);
-      setStatusType('error');
-      setStatus(`Error: ${(err as Error).message}`);
-    }
   }
 
   const formatTime = (seconds: number) => {
@@ -111,9 +56,9 @@ export default function DashboardPage() {
 
   if (!user) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-zinc-950">
+      <main className="flex min-h-screen items-center justify-center" style={{ background: '#030014' }}>
         <div className="flex flex-col items-center gap-3">
-          <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-500 border-t-transparent"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary-500 border-t-transparent"></div>
           <p className="text-zinc-400 text-sm">Loading secure dashboard...</p>
         </div>
       </main>
@@ -121,99 +66,100 @@ export default function DashboardPage() {
   }
 
   return (
-    <main className="relative flex min-h-screen flex-col items-center justify-center p-6 overflow-hidden">
-      <div className="bg-glow-1"></div>
-      <div className="bg-glow-2"></div>
+    <main className="relative min-h-screen flex items-center justify-center p-6 overflow-hidden" style={{ background: '#030014' }}>
+      <div className="hero-glow top-1/4 -left-32" />
+      <div className="hero-glow-2 bottom-1/4 -right-32" />
 
-      <div className="w-full max-w-xl glass-card rounded-2xl p-8 flex flex-col relative z-10">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-zinc-800/80 pb-6 mb-6">
+      <div className="w-full max-w-2xl glass-card rounded-2xl p-8 md:p-10 relative z-10">
+        <div className="flex items-center justify-between border-b border-white/5 pb-6 mb-8">
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-white">
-              Secure Dashboard
+              Dashboard
             </h1>
-            <p className="text-xs text-zinc-400 mt-1">
-              Biometric Authorization Protocol Active
+            <p className="text-sm text-zinc-500 mt-1">
+              Authenticated via WebAuthn
             </p>
           </div>
-          <div className="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center gap-1.5">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            Encrypted Session
+            <span className="text-xs font-medium text-emerald-400">Active Session</span>
           </div>
         </div>
 
-        {/* Welcome Block */}
-        <div className="bg-zinc-900/40 border border-zinc-800 rounded-xl p-5 mb-6">
-          <h2 className="text-lg font-semibold text-zinc-200">
-            Welcome, <span className="text-blue-400 font-bold">{user.username}</span> 👋
-          </h2>
-          <p className="text-xs text-zinc-400 mt-1">
-            You successfully logged in using your secure device hardware. No password was sent or stored.
-          </p>
-
-          <div className="mt-4 border-t border-zinc-800/60 pt-4 flex flex-col gap-2 text-xs">
-            <div className="flex justify-between">
-              <span className="text-zinc-500">Authorized Device(s):</span>
-              <span className="text-zinc-300 font-medium">
-                {user.devices.join(', ') || 'Secure Biometric Key'}
-              </span>
+        <div className="bg-white/[0.02] border border-white/5 rounded-xl p-6 md:p-8 mb-8">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-primary-500 to-purple-600 flex items-center justify-center text-white text-xl font-bold">
+              {user.username[0].toUpperCase()}
             </div>
-            <div className="flex justify-between">
-              <span className="text-zinc-500">User ID Signature:</span>
-              <span className="text-zinc-400 font-mono text-[10px] truncate max-w-[200px]">
-                {user.userId}
-              </span>
+            <div>
+              <h2 className="text-xl font-bold text-white">
+                Welcome, {user.username}
+              </h2>
+              <p className="text-sm text-zinc-400">
+                You are securely signed in
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+            <div className="bg-white/[0.02] border border-white/5 rounded-lg p-4">
+              <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">User ID</p>
+              <p className="text-sm text-zinc-300 font-mono truncate">{user.userId}</p>
+            </div>
+            <div className="bg-white/[0.02] border border-white/5 rounded-lg p-4">
+              <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">Device</p>
+              <p className="text-sm text-zinc-300">{user.devices.join(', ') || 'Biometric Key'}</p>
+            </div>
+            <div className="bg-white/[0.02] border border-white/5 rounded-lg p-4">
+              <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">Session Expires</p>
+              <p className="text-sm text-zinc-300 font-mono">
+                {timeLeft !== null ? formatTime(timeLeft) : 'Calculating...'}
+              </p>
+            </div>
+            <div className="bg-white/[0.02] border border-white/5 rounded-lg p-4">
+              <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">Auth Method</p>
+              <p className="text-sm text-emerald-400">Biometric (WebAuthn)</p>
             </div>
           </div>
         </div>
 
-        {/* Session Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          <div className="bg-zinc-900/30 border border-zinc-800/80 rounded-xl p-4 flex flex-col justify-between">
-            <span className="text-xs text-zinc-500 font-medium uppercase tracking-wider">
-              Session Remaining
-            </span>
-            <div className="text-lg font-bold text-zinc-200 mt-2 font-mono">
-              {timeLeft !== null ? formatTime(timeLeft) : 'Calculating...'}
+        <div className="bg-white/[0.02] border border-white/5 rounded-xl p-6 mb-8">
+          <h3 className="text-sm font-semibold text-zinc-300 mb-3">Security Status</h3>
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="w-2 h-2 rounded-full bg-emerald-400"></div>
+              <span className="text-sm text-zinc-400">Signature verified via WebAuthn</span>
             </div>
-          </div>
-
-          <div className="bg-zinc-900/30 border border-zinc-800/80 rounded-xl p-4 flex flex-col justify-between">
-            <span className="text-xs text-zinc-500 font-medium uppercase tracking-wider">
-              Extend / Renew session
-            </span>
-            <button
-              className="mt-2 text-xs font-semibold py-2 px-3 rounded-lg border border-blue-500/20 bg-blue-500/10 text-blue-400 hover:bg-blue-500 hover:text-white transition-all disabled:opacity-50"
-              onClick={handleRenewSession}
-              disabled={renewing}
-            >
-              {renewing ? 'Renewing...' : 'Renew Session'}
-            </button>
+            <div className="flex items-center gap-3">
+              <div className="w-2 h-2 rounded-full bg-emerald-400"></div>
+              <span className="text-sm text-zinc-400">Session encrypted (HttpOnly + Secure)</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="w-2 h-2 rounded-full bg-emerald-400"></div>
+              <span className="text-sm text-zinc-400">No passwords stored or transmitted</span>
+            </div>
           </div>
         </div>
 
         {status && (
-          <div
-            className={`p-3 rounded-lg text-xs border text-center mb-6 transition-all ${
-              statusType === 'error'
-                ? 'bg-red-500/10 border-red-500/20 text-red-400'
-                : statusType === 'success'
-                ? 'bg-green-500/10 border-green-500/20 text-green-400'
-                : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-300'
-            }`}
-          >
+          <div className="mb-6 p-3 rounded-lg text-xs border text-center bg-emerald-500/10 border-emerald-500/20 text-emerald-400">
             {status}
           </div>
         )}
 
-        {/* Footer Actions */}
-        <div className="flex gap-4 border-t border-zinc-800/80 pt-6">
+        <div className="flex gap-4 flex-wrap border-t border-white/5 pt-6">
           <button
-            className="flex-1 bg-zinc-900 border border-zinc-800 hover:bg-zinc-800 text-zinc-300 font-semibold text-xs py-3 rounded-lg transition-all"
             onClick={handleLogout}
+            className="px-6 py-3 rounded-xl bg-white/5 border border-white/10 text-zinc-300 hover:bg-white/10 hover:text-white text-sm font-medium transition-all"
           >
-            Secure Log Out
+            Sign Out
           </button>
+          <a
+            href="/"
+            className="px-6 py-3 rounded-xl bg-white/5 border border-white/10 text-zinc-300 hover:bg-white/10 hover:text-white text-sm font-medium transition-all"
+          >
+            Back to Home
+          </a>
         </div>
       </div>
     </main>

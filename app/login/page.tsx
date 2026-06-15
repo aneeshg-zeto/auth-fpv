@@ -45,6 +45,13 @@ export default function LoginPage() {
         body: JSON.stringify({ username }),
       }).then((r) => r.json());
 
+      if (opts.needsRegistration) {
+        setIsLoading(false);
+        setStatusType('info');
+        router.push('/register?username=' + encodeURIComponent(username));
+        return;
+      }
+
       if (opts.error) {
         setIsLoading(false);
         setStatusType('error');
@@ -53,16 +60,16 @@ export default function LoginPage() {
 
       setStatus('Waiting for biometrics (Touch ID / Face ID / Hello)...');
 
-      // Browser shows biometric prompt here
       const credential = await startAuthentication({ optionsJSON: opts });
 
       setStatus('Verifying device signature...');
 
-      const result = await fetch('/api/login/finish', {
+      const res = await fetch('/api/login/finish', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, credential }),
-      }).then((r) => r.json());
+      });
+      const result = await res.json();
 
       setIsLoading(false);
 
@@ -70,9 +77,19 @@ export default function LoginPage() {
         setStatusType('success');
         setStatus('Logged in successfully! Redirecting...');
         router.push('/dashboard');
+      } else if (result.hint === 'reregister') {
+        setStatusType('info');
+        router.push('/register?username=' + encodeURIComponent(result.username || username));
+      } else if (result.hint === 'stale_credential') {
+        setStatusType('error');
+        setStatus(
+          'Your saved passkey is outdated. Delete it from System Settings → Passwords → localhost, then register again.'
+        );
+      } else if (result.needsRegistration) {
+        router.push('/register?username=' + encodeURIComponent(result.username || username));
       } else {
         setStatusType('error');
-        setStatus(`Failed: ${result.error}`);
+        setStatus(result.error || 'Authentication failed');
       }
     } catch (err) {
       setIsLoading(false);
