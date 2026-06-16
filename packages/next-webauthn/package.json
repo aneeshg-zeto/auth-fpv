@@ -1,0 +1,60 @@
+{
+  "name": "next-webauthn",
+  "version": "0.1.0",
+  "author": "Aneesh G <aneeshg@zeto.studio>",
+  "description": "Drop-in passkey authentication for Next.js App Router. For Mac.",
+  "keywords": ["nextjs", "webauthn", "passkey", "touchid", "faceid", "biometric", "auth", "for-mac"],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aneeshg-zeto/auth-fpv.git"
+  },
+  "homepage": "https://next-webauthn.dev",
+  "bugs": {
+    "url": "https://github.com/aneeshg-zeto/auth-fpv/issues"
+  },
+  "main": "./dist/server/index.js",
+  "module": "./dist/server/index.mjs",
+  "types": "./dist/server/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/server/index.d.ts",
+      "import": "./dist/server/index.mjs",
+      "require": "./dist/server/index.js"
+    },
+    "./server": {
+      "types": "./dist/server/index.d.ts",
+      "import": "./dist/server/index.mjs",
+      "require": "./dist/server/index.js"
+    },
+    "./client": {
+      "types": "./dist/client/index.d.ts",
+      "import": "./dist/client/index.mjs",
+      "require": "./dist/client/index.js"
+    }
+  },
+  "files": ["dist", "README.md", "LICENSE"],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "peerDependencies": {
+    "next": ">=14.0.0",
+    "react": ">=18.0.0",
+    "react-dom": ">=18.0.0"
+  },
+  "dependencies": {
+    "@simplewebauthn/server": "13.3.1",
+    "@simplewebauthn/browser": "13.1.0",
+    "better-sqlite3": "^9.6.0",
+    "uuid": "^10.0.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/uuid": "^10.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.4.0"
+  }
+}

@@ -1,100 +1,88 @@
-# next-webauthn workspace
+# next-webauthn
 
-This repository contains:
+> Passkey authentication for Next.js App Router. **For Mac.**
 
-- a demo Next.js app in `my-webauthn-app/`
-- a reusable package in `my-webauthn-app/packages/next-webauthn/`
+No passwords. No browser storage. Just Touch ID, Face ID, or Windows Hello — and an HttpOnly session cookie.
 
-The goal is to turn the original local WebAuthn implementation into a reusable package that provides biometric auth for Next.js App Router apps with SQLite-backed state.
+[![npm](https://img.shields.io/npm/v/next-webauthn)](https://www.npmjs.com/package/next-webauthn)
+[![license](https://img.shields.io/github/license/aneeshg-zeto/auth-fpv)](LICENSE)
+[![CI](https://github.com/aneeshg-zeto/auth-fpv/actions/workflows/ci.yml/badge.svg)](https://github.com/aneeshg-zeto/auth-fpv/actions/workflows/ci.yml)
 
-## What the package provides
-
-`next-webauthn` is designed to provide:
-
-- zero browser storage (`localStorage`, `sessionStorage`, IndexedDB not used)
-- SQLite-backed challenge, passkey, and session storage
-- one-line middleware for protected pages
-- reusable route handlers for:
-  - register begin
-  - register finish
-  - login begin
-  - login finish
-  - logout
-  - me
-- React hooks and drop-in components
-- config-driven setup via `next-webauthn.config.ts`
-
-## Package location
-
-The package source lives at:
-
-- `packages/next-webauthn`
-
-Main entry:
-
-- `packages/next-webauthn/src/index.ts`
-
-## Current status
-
-### Complete
-
-- monorepo-style workspace scaffold added
-- package metadata and bundling config added
-- server config extraction completed
-- DB/auth helpers extracted into package
-- middleware factory added
-- route handler factories added
-- client hooks added
-- client components added
-- package README added
-- package-local diagnostics cleaned up
-
-### In progress / not fully validated
-
-- demo app is not yet fully rewired to consume the package end-to-end
-- npm install/build validation is blocked in this environment by native `better-sqlite3` compilation under Node `26.0.0`
-- npm publish has not been executed
-
-## Environment note
-
-The current machine is using Node `26.0.0`. `better-sqlite3` failed to compile during `npm install`, so full runtime validation could not be completed here.
-
-If you want a more reliable local demo/build path, use an LTS Node version that `better-sqlite3` supports well.
-
-## Local development
-
-From the app root:
+## Install
 
 ```bash
-npm install
-npm run dev
+npm install next-webauthn
 ```
 
-Because of the native dependency issue above, `npm install` may fail on this machine until the Node version is adjusted.
+## Requires
 
-## Package quick start
+- Next.js 14+
+- macOS with Touch ID / Face ID (For Mac)
+- Node.js 18+
 
-See:
+## Quick setup
 
-- `packages/next-webauthn/README.md`
+Create `middleware.ts` at the root of your Next.js project:
 
-That README documents:
+```ts
+import { createWebAuthnMiddleware } from "next-webauthn/server"
 
-- config
-- route mounting
-- middleware
-- hooks/components
-- publishing notes
+export default createWebAuthnMiddleware()
 
-## Important implementation notes
+export const config = {
+  matcher: ["/dashboard/:path*"],
+}
+```
 
-- all WebAuthn verification stays server-side
-- the browser only receives an opaque HttpOnly session cookie
-- DB path is resolved relative to `process.cwd()`
-- the current challenge design is still keyed by username to preserve the original behavior
+Create `app/api/[...path]/route.ts`:
 
-## Demo readiness
+```ts
+import {
+  createRegisterBeginHandler,
+  createRegisterFinishHandler,
+  createLoginBeginHandler,
+  createLoginFinishHandler,
+  createLogoutHandler,
+  createMeHandler,
+} from "next-webauthn/server"
+import type { NextRequest } from "next/server"
 
-This repo is **package-refactor ready**, but **not yet fully demo-wired** inside the existing app.
+const registerBegin = createRegisterBeginHandler()
+const registerFinish = createRegisterFinishHandler()
+const loginBegin = createLoginBeginHandler()
+const loginFinish = createLoginFinishHandler()
+const logout = createLogoutHandler()
+const me = createMeHandler()
 
-When the app is rewired to use the package routes/middleware directly and passes runtime validation, it will be ready for a full demo.
+export async function POST(req: NextRequest, context: { params: Promise<{ path: string[] }> }) {
+  const { path } = await context.params
+  const joined = path.join("/")
+  if (joined === "register/begin") return registerBegin(req)
+  if (joined === "register/finish") return registerFinish(req)
+  if (joined === "login/begin") return loginBegin(req)
+  if (joined === "login/finish") return loginFinish(req)
+  if (joined === "logout") return logout(req)
+  return new Response("Not found", { status: 404 })
+}
+
+export async function GET(req: NextRequest, context: { params: Promise<{ path: string[] }> }) {
+  const { path } = await context.params
+  const joined = path.join("/")
+  if (joined === "me") return me(req)
+  return new Response("Not found", { status: 404 })
+}
+```
+
+## Security
+
+See [SECURITY.md](SECURITY.md) to report vulnerabilities.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## License
+
+MIT — see [LICENSE](LICENSE)
+
+Maintained by [Aneesh G](mailto:aneeshg@zeto.studio).
