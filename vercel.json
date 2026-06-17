@@ -1,5 +1,5 @@
 {
-  "buildCommand": "npm run build -w demo",
+  "buildCommand": "npm run build -w next-webauthn && npm run build -w demo",
   "outputDirectory": "apps/demo/.next",
   "framework": "nextjs"
 }
