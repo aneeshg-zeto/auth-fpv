@@ -1,4 +1,19 @@
+import {
+  createRegisterBeginHandler,
+  createRegisterFinishHandler,
+  createLoginBeginHandler,
+  createLoginFinishHandler,
+  createLogoutHandler,
+  createMeHandler,
+} from "next-webauthn/server"
 import type { NextRequest } from "next/server"
+
+const registerBegin = createRegisterBeginHandler()
+const registerFinish = createRegisterFinishHandler()
+const loginBegin = createLoginBeginHandler()
+const loginFinish = createLoginFinishHandler()
+const logout = createLogoutHandler()
+const me = createMeHandler()
 
 export async function POST(
   req: NextRequest,
@@ -6,13 +21,12 @@ export async function POST(
 ) {
   const { path } = await context.params
   const joined = path.join("/")
-  const m = await import("next-webauthn/server")
 
-  if (joined === "register/begin") return m.createRegisterBeginHandler()(req)
-  if (joined === "register/finish") return m.createRegisterFinishHandler()(req)
-  if (joined === "login/begin") return m.createLoginBeginHandler()(req)
-  if (joined === "login/finish") return m.createLoginFinishHandler()(req)
-  if (joined === "logout") return m.createLogoutHandler()(req)
+  if (joined === "register/begin") return registerBegin(req)
+  if (joined === "register/finish") return registerFinish(req)
+  if (joined === "login/begin") return loginBegin(req)
+  if (joined === "login/finish") return loginFinish(req)
+  if (joined === "logout") return logout(req)
 
   return new Response("Not found", { status: 404 })
 }
@@ -24,10 +38,7 @@ export async function GET(
   const { path } = await context.params
   const joined = path.join("/")
 
-  if (joined === "me") {
-    const m = await import("next-webauthn/server")
-    return m.createMeHandler()(req)
-  }
+  if (joined === "me") return me(req)
 
   return new Response("Not found", { status: 404 })
 }
