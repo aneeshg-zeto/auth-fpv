@@ -1,6 +1,6 @@
 {
   "name": "next-webauthn",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": "Aneesh G <aneeshg@zeto.studio>",
   "description": "Drop-in passkey authentication for Next.js App Router. For Mac.",
   "keywords": [
