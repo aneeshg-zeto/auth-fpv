@@ -3,7 +3,16 @@
   "version": "0.1.0",
   "author": "Aneesh G <aneeshg@zeto.studio>",
   "description": "Drop-in passkey authentication for Next.js App Router. For Mac.",
-  "keywords": ["nextjs", "webauthn", "passkey", "touchid", "faceid", "biometric", "auth", "for-mac"],
+  "keywords": [
+    "nextjs",
+    "webauthn",
+    "passkey",
+    "touchid",
+    "faceid",
+    "biometric",
+    "auth",
+    "for-mac"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -33,7 +42,11 @@
       "require": "./dist/client/index.js"
     }
   },
-  "files": ["dist", "README.md", "LICENSE"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
@@ -46,13 +59,13 @@
     "react-dom": ">=18.0.0"
   },
   "dependencies": {
-    "@simplewebauthn/server": "13.3.1",
     "@simplewebauthn/browser": "13.1.0",
-    "better-sqlite3": "^9.6.0",
+    "@simplewebauthn/server": "13.3.1",
+    "better-sqlite3": "^12.11.1",
     "uuid": "^10.0.0"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.11",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/uuid": "^10.0.0",
     "tsup": "^8.0.0",
     "typescript": "^5.4.0"
