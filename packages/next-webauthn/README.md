@@ -131,7 +131,6 @@ Import from `next-webauthn/server`:
 - Route factories: `createRegisterBeginHandler`, `createRegisterFinishHandler`, `createLoginBeginHandler`, `createLoginFinishHandler`, `createLogoutHandler`, `createMeHandler`
 - `createWebAuthnMiddleware(config?)` — edge middleware
 - `resolveWebAuthnConfig(config?)`, `resolveDbPath(config?)`, `defaultRoutes`
-- Auth helpers: `normalizeBase64URL`, `validateInput`, `rateLimit`, `saveChallenge`, `consumeChallenge`, `findUserByUsername`, `findUserById`, `createUser`, `savePasskey`, `findPasskeyByCredentialId`, `findPasskeysByUserId`, `updatePasskeyCounter`, `createSession`, `getSession`, `deleteSession`
 
 ## Security
 
@@ -141,10 +140,3 @@ Import from `next-webauthn/server`:
 - Rate limiting on all auth endpoints (5/min registration, 10/min login)
 - HttpOnly, Secure, SameSite=Strict cookies only
 - No browser storage of any kind
-
-## Notes
-
-- `@simplewebauthn/server` v13.3.1 — `cred.id` is `Base64URLString`, stored directly (no `Buffer.from`)
-- `normalizeBase64URL()` is applied at every credential_id store/read boundary
-- `better-sqlite3` is a native module. On Node 26+, use `--ignore-scripts` with a prebuilt binary.
-- This package is optimized For Mac — test on macOS when possible.
