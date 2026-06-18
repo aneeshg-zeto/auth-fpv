@@ -2,6 +2,8 @@
 
 Drop-in passkey authentication for Next.js App Router. **For Mac.**
 
+[![npm](https://img.shields.io/npm/v/next-webauthn)](https://www.npmjs.com/package/next-webauthn)
+
 ## Install
 
 ```bash
