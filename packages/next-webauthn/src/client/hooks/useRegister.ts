@@ -32,23 +32,24 @@ export function useRegister(config?: ClientWebAuthnConfig) {
     setLoading(true)
     setError(null)
     try {
-      const beginResponse = await fetch(routes.registerBegin, {
+      const beginRes = await fetch(routes.registerBegin, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username }),
       })
-      const options = await beginResponse.json()
-      if (!beginResponse.ok || options.error) {
-        throw new Error(options.error ?? 'Failed to begin registration')
+      const beginData = await beginRes.json()
+      if (!beginRes.ok || beginData.error) {
+        throw new Error(beginData.error ?? 'Failed to begin registration')
       }
+      const { challengeId, ...options } = beginData
       const credential = await startRegistration({ optionsJSON: options })
-      const finishResponse = await fetch(routes.registerFinish, {
+      const finishRes = await fetch(routes.registerFinish, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, credential }),
+        body: JSON.stringify({ username, credential, challengeId }),
       })
-      const result = await finishResponse.json()
-      if (!finishResponse.ok || result.error) {
+      const result = await finishRes.json()
+      if (!finishRes.ok || result.error) {
         throw new Error(result.error ?? 'Failed to finish registration')
       }
       return result

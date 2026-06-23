@@ -1,0 +1,37 @@
+@import "tailwindcss";
+
+@theme {
+  --color-fp: #7c3aed;
+  --color-fp-light: #a78bfa;
+  --color-surface: #0a0a0a;
+  --color-surface-2: #141414;
+  --color-border: #1f1f1f;
+  --color-muted: #a3a3a3;
+}
+
+@keyframes pulse-slow {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.8; }
+}
+
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes scan-line {
+  0% { top: 0%; }
+  100% { top: 100%; }
+}
+
+.animate-pulse-slow {
+  animation: pulse-slow 4s ease-in-out infinite;
+}
+
+.animate-spin-slow {
+  animation: spin-slow 30s linear infinite;
+}
+
+.animate-scan-line {
+  animation: scan-line 3s ease-in-out infinite;
+}

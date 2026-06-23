@@ -1,5 +1,5 @@
 {
-  "buildCommand": "npm run build -w demo",
-  "outputDirectory": "apps/demo/.next",
+  "buildCommand": "npm run build -w landing",
+  "outputDirectory": "apps/landing/out",
   "framework": "nextjs"
 }

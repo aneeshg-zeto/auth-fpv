@@ -11,12 +11,8 @@ export interface WebAuthnSession {
 }
 
 const defaultRoutes = {
-  registerBegin: '/api/auth/register/begin',
-  registerFinish: '/api/auth/register/finish',
-  loginBegin: '/api/auth/login/begin',
-  loginFinish: '/api/auth/login/finish',
-  logout: '/api/auth/logout',
   me: '/api/auth/me',
+  logout: '/api/auth/logout',
 }
 
 export function useSession(config?: ClientWebAuthnConfig) {
@@ -27,12 +23,12 @@ export function useSession(config?: ClientWebAuthnConfig) {
   const refresh = useCallback(async () => {
     setLoading(true)
     try {
-      const response = await fetch(routes.me, { credentials: 'same-origin' })
-      if (!response.ok) {
+      const res = await fetch(routes.me, { credentials: 'same-origin' })
+      if (!res.ok) {
         setUser(null)
         return null
       }
-      const data = (await response.json()) as WebAuthnSession
+      const data = (await res.json()) as WebAuthnSession
       setUser(data)
       return data
     } finally {

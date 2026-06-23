@@ -22,23 +22,24 @@ export function useLogin(config?: ClientWebAuthnConfig) {
     setLoading(true)
     setError(null)
     try {
-      const beginResponse = await fetch(routes.loginBegin, {
+      const beginRes = await fetch(routes.loginBegin, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username }),
       })
-      const options = await beginResponse.json()
-      if (!beginResponse.ok || options.error) {
-        throw new Error(options.error ?? 'Failed to begin login')
+      const beginData = await beginRes.json()
+      if (!beginRes.ok || beginData.error) {
+        throw new Error(beginData.error ?? 'Failed to begin login')
       }
+      const { challengeId, ...options } = beginData
       const credential = await startAuthentication({ optionsJSON: options })
-      const finishResponse = await fetch(routes.loginFinish, {
+      const finishRes = await fetch(routes.loginFinish, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, credential }),
+        body: JSON.stringify({ credential, challengeId }),
       })
-      const result = await finishResponse.json()
-      if (!finishResponse.ok || result.error) {
+      const result = await finishRes.json()
+      if (!finishRes.ok || result.error) {
         throw new Error(result.error ?? 'Failed to finish login')
       }
       return result
@@ -51,5 +52,39 @@ export function useLogin(config?: ClientWebAuthnConfig) {
     }
   }, [routes.loginBegin, routes.loginFinish])
 
-  return { startLogin, loading, error }
+  const startConditionalLogin = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const beginRes = await fetch(routes.loginBegin, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'conditional' }),
+      })
+      const beginData = await beginRes.json()
+      if (!beginRes.ok || beginData.error) {
+        throw new Error(beginData.error ?? 'Failed to begin conditional login')
+      }
+      const { challengeId, ...options } = beginData
+      const credential = await startAuthentication({ optionsJSON: options, useBrowserAutofill: true })
+      const finishRes = await fetch(routes.loginFinish, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credential, challengeId }),
+      })
+      const result = await finishRes.json()
+      if (!finishRes.ok || result.error) {
+        throw new Error(result.error ?? 'Failed to finish login')
+      }
+      return result
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Login failed'
+      setError(message)
+      throw err
+    } finally {
+      setLoading(false)
+    }
+  }, [routes.loginBegin, routes.loginFinish])
+
+  return { startLogin, startConditionalLogin, loading, error }
 }

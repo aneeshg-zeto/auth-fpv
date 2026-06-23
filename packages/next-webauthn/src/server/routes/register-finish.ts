@@ -1,15 +1,18 @@
 import { verifyRegistrationResponse, type RegistrationResponseJSON } from '@simplewebauthn/server'
 import { NextResponse, type NextRequest } from 'next/server'
-import { consumeChallenge, findUserByUsername, normalizeBase64URL, rateLimit, savePasskey, validateInput } from '../auth'
-import { getDb } from '../db'
-import { resolveWebAuthnConfig, type WebAuthnConfig } from '../../config'
+import { resolveWebAuthnConfig, type WebAuthnConfig } from '../config'
+import { getAdapter, normalizeBase64URL, validateInput } from '../auth'
+import { createRateLimiter } from '../rate-limit'
+import type { Passkey } from '../../types'
+
+const rateLimiter = createRateLimiter()
 
 export function createRegisterFinishHandler(config?: WebAuthnConfig) {
   return async function registerFinishHandler(req: NextRequest) {
     const resolved = resolveWebAuthnConfig(config)
-    const db = getDb(resolved)
+    const adapter = getAdapter(resolved)
     const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
-    if (!rateLimit(ip, 'register-finish', 5, { db, config: resolved }).allowed) {
+    if (!rateLimiter.check(ip).allowed) {
       return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
     }
 
@@ -23,24 +26,26 @@ export function createRegisterFinishHandler(config?: WebAuthnConfig) {
     const validationError = validateInput(body, {
       username: { type: 'string', required: true },
       credential: { type: 'object', required: true },
+      challengeId: { type: 'string', required: true },
     })
     if (validationError) {
       return NextResponse.json({ error: validationError }, { status: 400 })
     }
 
     const { username } = body as { username: string }
-    const credential = (body as Record<string, unknown>).credential as unknown as RegistrationResponseJSON
+    const challengeId = body.challengeId as string
+    const credential = body.credential as unknown as RegistrationResponseJSON
     if (!credential.id || !credential.rawId || !credential.response || !credential.type) {
       return NextResponse.json({ error: 'Invalid credential format' }, { status: 400 })
     }
 
-    const user = findUserByUsername(username, { db, config: resolved })
+    const user = adapter.findUserByUsername(username)
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    const expectedChallenge = consumeChallenge(username, 'registration', { db, config: resolved })
-    if (!expectedChallenge) {
+    const challenge = adapter.consumeChallenge(challengeId)
+    if (!challenge) {
       return NextResponse.json({ error: 'Challenge expired or not found' }, { status: 400 })
     }
 
@@ -49,7 +54,7 @@ export function createRegisterFinishHandler(config?: WebAuthnConfig) {
 
       const verification = await verifyRegistrationResponse({
         response: credential as RegistrationResponseJSON,
-        expectedChallenge,
+        expectedChallenge: challenge.challenge,
         expectedOrigin: origin,
         expectedRPID: resolved.rpID,
         requireUserVerification: true,
@@ -61,16 +66,36 @@ export function createRegisterFinishHandler(config?: WebAuthnConfig) {
 
       const { credential: cred } = verification.registrationInfo
       const credentialId = normalizeBase64URL(cred.id)
-      const publicKey = Buffer.from(cred.publicKey).toString('base64url')
+      const publicKey = Buffer.from(cred.publicKey).toString('base64')
       const counter = cred.counter
+      const now = Math.floor(Date.now() / 1000)
 
-      savePasskey(
-        { userId: user.id, credentialId, publicKey, counter },
-        { db, config: resolved },
-      )
+      adapter.savePasskey({
+        userId: user.id,
+        credentialId,
+        publicKey,
+        counter,
+      })
+
+      if (resolved.onRegister) {
+        const passkeyInfo: Passkey = {
+          id: '',
+          userId: user.id,
+          credentialId,
+          publicKey,
+          counter,
+          deviceName: null,
+          createdAt: now,
+          lastUsed: null,
+        }
+        await resolved.onRegister(user, passkeyInfo, req)
+      }
 
       return NextResponse.json({ verified: true })
     } catch (error) {
+      if (resolved.onError) {
+        await resolved.onError(error as Error, req)
+      }
       return NextResponse.json({ error: (error as Error).message }, { status: 400 })
     }
   }

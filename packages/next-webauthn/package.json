@@ -1,6 +1,6 @@
 {
   "name": "next-webauthn",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "author": "Aneesh G <aneeshg@zeto.studio>",
   "description": "Drop-in passkey authentication for Next.js App Router. For Mac.",
   "keywords": [
@@ -22,14 +22,17 @@
   "bugs": {
     "url": "https://github.com/aneeshg-zeto/auth-fpv/issues"
   },
-  "main": "./dist/server/index.js",
-  "module": "./dist/server/index.mjs",
-  "types": "./dist/server/index.d.ts",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "next-webauthn": "./dist/cli/init.mjs"
+  },
   "exports": {
     ".": {
-      "types": "./dist/server/index.d.ts",
-      "import": "./dist/server/index.mjs",
-      "require": "./dist/server/index.js"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
     },
     "./server": {
       "types": "./dist/server/index.d.ts",
@@ -54,13 +57,13 @@
     "prepublishOnly": "npm run build"
   },
   "peerDependencies": {
-    "next": ">=14.0.0",
+    "@simplewebauthn/browser": ">=13.0.0",
+    "next": ">=15.0.0",
     "react": ">=18.0.0",
     "react-dom": ">=18.0.0"
   },
   "dependencies": {
     "@simplewebauthn/server": "13.3.1",
-    "@simplewebauthn/browser": "13.1.0",
     "better-sqlite3": "^12.11.1",
     "uuid": "^11.0.0"
   },

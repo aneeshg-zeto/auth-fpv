@@ -1,15 +1,18 @@
-import { generateRegistrationOptions } from '@simplewebauthn/server'
+import { generateRegistrationOptions, type AuthenticatorTransportFuture } from '@simplewebauthn/server'
 import { NextResponse, type NextRequest } from 'next/server'
-import { createUser, findPasskeysByUserId, findUserByUsername, rateLimit, saveChallenge, validateInput } from '../auth'
-import { getDb } from '../db'
-import { resolveWebAuthnConfig, type WebAuthnConfig } from '../../config'
+import { randomUUID } from 'node:crypto'
+import { resolveWebAuthnConfig, type WebAuthnConfig } from '../config'
+import { getAdapter, normalizeBase64URL, toBase64URL, validateInput } from '../auth'
+import { createRateLimiter } from '../rate-limit'
+
+const rateLimiter = createRateLimiter()
 
 export function createRegisterBeginHandler(config?: WebAuthnConfig) {
   return async function registerBeginHandler(req: NextRequest) {
     const resolved = resolveWebAuthnConfig(config)
-    const db = getDb(resolved)
+    const adapter = getAdapter(resolved)
     const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
-    if (!rateLimit(ip, 'register-begin', 5, { db, config: resolved }).allowed) {
+    if (!rateLimiter.check(ip).allowed) {
       return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
     }
 
@@ -28,18 +31,18 @@ export function createRegisterBeginHandler(config?: WebAuthnConfig) {
     }
 
     const { username } = body as { username: string }
-    let user = findUserByUsername(username, { db, config: resolved })
+    let user = adapter.findUserByUsername(username)
     let userId: string
     let existingCredentialIds: string[] = []
 
     if (user) {
       userId = user.id
-      existingCredentialIds = findPasskeysByUserId(userId, { db, config: resolved }).map(
-        (passkey) => passkey.credential_id,
+      existingCredentialIds = adapter.findPasskeysByUserId(userId).map(
+        (passkey) => toBase64URL(passkey.credentialId),
       )
     } else {
-      userId = createUser(username, { db, config: resolved })
-      user = findUserByUsername(username, { db, config: resolved })
+      user = adapter.createUser(username)
+      userId = user.id
     }
 
     const options = await generateRegistrationOptions({
@@ -48,7 +51,7 @@ export function createRegisterBeginHandler(config?: WebAuthnConfig) {
       userID: new TextEncoder().encode(userId),
       userName: username,
       attestationType: 'none',
-      excludeCredentials: existingCredentialIds.map((id) => ({ id, transports: [] })),
+      excludeCredentials: existingCredentialIds.map((id) => ({ id, transports: [] as AuthenticatorTransportFuture[] })),
       authenticatorSelection: {
         authenticatorAttachment: 'platform',
         residentKey: 'required',
@@ -56,7 +59,16 @@ export function createRegisterBeginHandler(config?: WebAuthnConfig) {
       },
     })
 
-    saveChallenge(username, options.challenge, 'registration', { db, config: resolved })
-    return NextResponse.json(options)
+    const challengeId = randomUUID()
+    const now = Math.floor(Date.now() / 1000)
+    adapter.saveChallenge({
+      id: challengeId,
+      challenge: options.challenge,
+      type: 'registration',
+      expiresAt: now + resolved.challengeTTL,
+      userId,
+    })
+
+    return NextResponse.json({ ...options, challengeId })
   }
 }
