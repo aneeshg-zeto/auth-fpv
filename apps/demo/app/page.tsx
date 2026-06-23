@@ -7,7 +7,6 @@ const s: Record<string, React.CSSProperties> = {
   hero: { minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 24px', textAlign: 'center' as const, position: 'relative' as const, background: '#fff' },
   headline: { fontFamily: "'SF Mono', 'SF Pro Text', 'Fira Code', monospace", fontSize: 96, fontWeight: 700, color: '#000', letterSpacing: '-0.04em', lineHeight: 1 },
   subhead: { fontSize: 24, fontWeight: 400, color: '#666', maxWidth: 480, lineHeight: 1.5, marginTop: 24, letterSpacing: '0.01em' },
-  fpsvg: { width: 80, height: 80, stroke: '#000', fill: 'none', strokeWidth: 1.0, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, opacity: 0.4, marginBottom: 8 },
   heroButtons: { display: 'flex', gap: 12, marginTop: 32 },
   heroBtn: { height: 48, padding: '0 28px', border: '1px solid #000', background: '#fff', color: '#000', fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, fontWeight: 500, letterSpacing: '0.01em', transition: 'all 0.15s ease' },
   installStrip: { background: '#fff', padding: '28px 24px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 16, borderBottom: '1px solid #e8e8e8' },
@@ -19,7 +18,7 @@ const s: Record<string, React.CSSProperties> = {
   featuresGrid: { display: 'flex', gap: 0, border: '1px solid #e8e8e8', overflow: 'hidden' as const },
   featureCard: { flex: 1, padding: '48px 40px', borderRight: '1px solid #e8e8e8', background: '#fafafa' },
   featureCardLast: { flex: 1, padding: '48px 40px', background: '#fafafa' },
-  featureIcon: { width: 28, height: 28, stroke: '#000', fill: 'none', strokeWidth: 1.5, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, marginBottom: 20 },
+  featureIcon: { width: 28, height: 28, marginBottom: 20 },
   featureNum: { fontFamily: "'SF Mono', 'Fira Code', monospace", fontSize: 12, color: '#bbb', letterSpacing: '0.05em', marginBottom: 8 },
   featureName: { fontSize: 20, fontWeight: 600, color: '#000', marginBottom: 12, letterSpacing: '-0.01em' },
   featureDesc: { fontSize: 14, color: '#666', lineHeight: 1.7, maxWidth: 280 },
@@ -55,7 +54,7 @@ export default function LandingPage() {
         <h1 style={s.headline}>next-webauthn</h1>
         <p style={s.subhead}>Passkey auth for Next.js for Mac.</p>
         <div style={s.heroButtons}>
-          <a style={s.heroBtn as React.CSSProperties} href="/register"
+          <a style={s.heroBtn as React.CSSProperties} href="https://www.npmjs.com/package/next-webauthn"
             onMouseEnter={(e) => { e.currentTarget.style.background = '#000'; e.currentTarget.style.color = '#fff' }}
             onMouseLeave={(e) => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.color = '#000' }}
           >Get Started →</a>
