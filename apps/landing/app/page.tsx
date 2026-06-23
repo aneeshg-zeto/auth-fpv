@@ -1,4 +1,5 @@
 import { FingerprintSVG } from '@/components/FingerprintSVG'
+import { InstallCmd } from '@/components/InstallCmd'
 
 function HeroSection() {
   return (
@@ -96,43 +97,6 @@ function FeaturesSection() {
             </div>
           ))}
         </div>
-      </div>
-    </section>
-  )
-}
-
-function CliSection() {
-  return (
-    <section className="py-32 px-6">
-      <div className="max-w-4xl mx-auto text-center">
-        <h2 className="text-4xl md:text-5xl font-bold tracking-tight mb-8">
-          One command to start
-        </h2>
-        <p className="text-muted max-w-xl mx-auto mb-12">
-          Install the package, run the CLI, and add a component. That is the entire setup.
-        </p>
-        <div className="bg-surface-2 border border-border rounded-xl p-8 text-left font-mono text-sm space-y-3">
-          <div>
-            <span className="text-fp">$</span>{' '}
-            <span className="text-green-400">npm install next-webauthn</span>
-          </div>
-          <div>
-            <span className="text-fp">$</span>{' '}
-            <span className="text-green-400">npx next-webauthn init</span>
-          </div>
-          <div className="text-muted pt-2 border-t border-border">
-            <span className="text-fp">✓</span> Created app/api/auth/[...path]/route.ts
-          </div>
-          <div className="text-muted">
-            <span className="text-fp">✓</span> Created middleware.ts
-          </div>
-          <div className="text-muted">
-            <span className="text-fp">✓</span> Added RP_ID=localhost and ORIGIN to .env.local
-          </div>
-        </div>
-        <p className="text-muted text-sm mt-6">
-          Add {'<LoginForm />'} or {'<AutoFillPasskeyButton />'} to any page. Authentication works.
-        </p>
       </div>
     </section>
   )
@@ -272,7 +236,7 @@ export default function Home() {
     <>
       <HeroSection />
       <FeaturesSection />
-      <CliSection />
+      <InstallCmd />
       <DemoSection />
       <TestimonialSection />
       <CTASection />
